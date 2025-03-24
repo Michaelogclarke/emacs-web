@@ -1,195 +1,274 @@
-const editor = document.getElementById('editor');
 const bufferList = document.getElementById('buffer-list');
-const statusBar = document.getElementById('status-bar');
-const lineNumbers = document.getElementById('line-numbers');
+const textArea = document.getElementById('text-area');
+const editor = document.getElementById('editor'); //Get the editor div.
+let buffers = {};
+let currentBuffer = 'default';
+let commandMode = false;
+function createBuffer(name, content = '') {
+    buffers[name] = content;
+    const button = document.createElement('button');
+    button.textContent = name;
+    button.addEventListener('click', () => switchBuffer(name));
+    bufferList.appendChild(button);
+}
 
-let buffers = { 'buffer1': '' };
-let currentBuffer = 'buffer1';
+function switchBuffer(name) {
+    saveBuffers();
+    buffers[currentBuffer] = textArea.value;
+    currentBuffer = name;
+    textArea.value = buffers[name];
+    updateActiveBufferButton();
+    highlightSyntax();
+    updateLineNumbers(); // Update line numbers after switching
+}
 
-function updateBufferList() {
-    bufferList.innerHTML = '';
-    for (const bufferName in buffers) {
-        const button = document.createElement('button');
-        button.textContent = bufferName;
-        button.addEventListener('click', () => switchBuffer(bufferName));
-        bufferList.appendChild(button);
+function updateActiveBufferButton() {
+    const buttons = bufferList.querySelectorAll('button');
+    buttons.forEach(button => {
+        if (button.textContent === currentBuffer) {
+            button.classList.add('active');
+        } else {
+            button.classList.remove('active');
+        }
+    });
+}
+
+function saveBuffers() {
+    localStorage.setItem('buffers', JSON.stringify(buffers));
+    localStorage.setItem('currentBuffer', currentBuffer);
+}
+
+function loadBuffers() {
+    const storedBuffers = JSON.parse(localStorage.getItem('buffers'));
+    const storedCurrentBuffer = localStorage.getItem('currentBuffer');
+    if (storedBuffers) {
+        buffers = storedBuffers;
+        for (const name in buffers) {
+            createBuffer(name, buffers[name]);
+        }
+        currentBuffer = storedCurrentBuffer || 'default';
+        textArea.value = buffers[currentBuffer] || '';
+        updateActiveBufferButton();
+        highlightSyntax();
+        updateLineNumbers();
+    } else {
+        createBuffer('default', "");
+        updateActiveBufferButton();
+        updateLineNumbers();
     }
 }
 
-function switchBuffer(bufferName) {
-    buffers[currentBuffer] = editor.value;
-    currentBuffer = bufferName;
-    editor.value = buffers[currentBuffer];
-    updateStatusBar();
+loadBuffers();
+
+textArea.addEventListener('input', () => {
+    buffers[currentBuffer] = textArea.value;
+    highlightSyntax();
     updateLineNumbers();
+});
+
+function newBuffer() {
+    const newName = prompt("Enter new buffer name:", "new-buffer");
+    if (newName && !buffers[newName]) {
+        createBuffer(newName, "");
+        switchBuffer(newName);
+    } else {
+        alert("Invalid or existing name");
+    }
 }
 
-function createBuffer(bufferName) {
-    buffers[bufferName] = '';
-    switchBuffer(bufferName);
-    updateBufferList();
+const newBufferButton = document.createElement("button");
+newBufferButton.textContent = "New Buffer";
+newBufferButton.addEventListener("click", newBuffer);
+bufferList.appendChild(newBufferButton);
+
+// Syntax Highlighting (Basic JavaScript)
+function highlightSyntax() {
+    let content = textArea.value;
+    content = content.replace(/(function|var|let|const|if|else|for|while)/g, '<span style="color: #c678dd;">$1</span>');
+    content = content.replace(/(\d+)/g, '<span style="color: #d19a66;">$1</span>');
+    content = content.replace(/(".*?"|'.*?')/g, '<span style="color: #98c379;">$1</span>');
+    textArea.innerHTML = content;
 }
 
-function updateStatusBar() {
-    const line = editor.value.substr(0, editor.selectionStart).split('\n').length;
-    const col = editor.selectionStart - editor.value.lastIndexOf('\n', editor.selectionStart - 1) - 1;
-    statusBar.textContent = `Buffer: ${currentBuffer} | Line: ${line} | Col: ${col}`;
+// Search Functionality
+function search() {
+    const searchTerm = prompt("Enter search term:");
+    if (searchTerm) {
+        const regex = new RegExp(searchTerm, 'gi');
+        const matches = textArea.value.match(regex);
+        if (matches) {
+            alert(`Found ${matches.length} matches.`);
+            const highlightedText = textArea.value.replace(regex, '<span style="background-color: yellow;">$&</span>');
+            textArea.innerHTML = highlightedText;
+        } else {
+            alert("No matches found.");
+        }
+    }
 }
+
+const searchButton = document.createElement("button");
+searchButton.textContent = "Search";
+searchButton.addEventListener("click", search);
+bufferList.appendChild(searchButton);
+
+// Line Numbers
+const lineNumbers = document.createElement("div");
+lineNumbers.style.width = "30px";
+lineNumbers.style.backgroundColor = "#282c34";
+lineNumbers.style.color = "#828997";
+lineNumbers.style.padding = "10px";
+lineNumbers.style.overflowY = "hidden"; //Remove line number scroll bar.
+lineNumbers.style.whiteSpace = "pre";
+lineNumbers.style.textAlign = "right";
+lineNumbers.style.height = "100%";
+lineNumbers.style.boxSizing = "border-box";
+document.getElementById("editor-container").insertBefore(lineNumbers, document.getElementById("editor"));
 
 function updateLineNumbers() {
-    const lines = editor.value.split('\n').length;
-    let numbers = '';
-    for (let i = 1; i <= lines; i++) {
-        numbers += i + '\n';
+    const lines = textArea.value.split("\n");
+    let numbers = "";
+    for (let i = 1; i <= lines.length; i++) {
+        numbers += i + "\n";
     }
     lineNumbers.textContent = numbers;
-
-    // Calculate line number width based on the maximum number of digits
-    const maxDigits = String(lines).length;
-    lineNumbers.style.width = (maxDigits * 10 + 30) + 'px'; // Adjust padding as needed
 }
 
-editor.addEventListener('input', () => {
-    buffers[currentBuffer] = editor.value;
-    updateStatusBar();
-    updateLineNumbers();
+textArea.addEventListener("input", updateLineNumbers);
+updateLineNumbers();
+
+//Synchronize scroll.
+editor.addEventListener('scroll', function(){
+    lineNumbers.scrollTop = editor.scrollTop;
 });
 
-editor.addEventListener('keydown', (event) => {
-    if (event.ctrlKey) {
+function handleVimMotion(event) {
+    if (commandMode) {
         switch (event.key) {
-            case 'f':
-                event.preventDefault();
-                editor.selectionStart++;
-                editor.selectionEnd = editor.selectionStart;
-                break;
-            case 'b':
-                event.preventDefault();
-                editor.selectionStart--;
-                editor.selectionEnd = editor.selectionStart;
-                break;
-            case 'a':
-                event.preventDefault();
-                const currentLineStart = editor.value.lastIndexOf('\n', editor.selectionStart - 1) + 1;
-                editor.selectionStart = currentLineStart;
-                editor.selectionEnd = currentLineStart;
-                break;
-            case 'e':
-                event.preventDefault();
-                const currentLineEnd = editor.value.indexOf('\n', editor.selectionStart);
-                editor.selectionStart = currentLineEnd === -1 ? editor.value.length : currentLineEnd;
-                editor.selectionEnd = editor.selectionStart;
+            case 'j':
+                moveDown();
                 break;
             case 'k':
-                event.preventDefault();
-                const lineEnd = editor.value.indexOf('\n', editor.selectionStart);
-                if (lineEnd === -1) {
-                    editor.value = editor.value.substring(0, editor.selectionStart);
-                } else {
-                    editor.value = editor.value.substring(0, editor.selectionStart) + editor.value.substring(lineEnd + 1);
-                }
-                editor.selectionEnd = editor.selectionStart;
+                moveUp();
                 break;
-            case 'x':
-                event.preventDefault();
-                const newBufferName = prompt('Enter new buffer name:');
-                if (newBufferName) {
-                    createBuffer(newBufferName);
+            case 'h':
+                moveLeft();
+                break;
+            case 'l':
+                moveRight();
+                break;
+            case 'g':
+                if (event.getModifierState("Shift")){
+                  goToBottom();
                 }
                 break;
-            case 's':
-                event.preventDefault();
-                const searchText = prompt('Enter search text:');
-                if (searchText) {
-                    const index = editor.value.indexOf(searchText, editor.selectionStart);
-                    if (index !== -1) {
-                        editor.selectionStart = index;
-                        editor.selectionEnd = index + searchText.length;
-                    }
-                }
+            case 'G':
+                goToBottom();
+                break;
+            default:
                 break;
         }
-    }
-});
-
-
-function saveFile(name, content) {
-    localStorage.setItem(name, content);
-    console.log(`File "${name}" saved to local storage.`);
-}
-const loadButton = document.getElementById('loadButton');
-
-editor.addEventListener('dragover', (event) => {
-    event.preventDefault();
-});
-
-editor.addEventListener('drop', (event) => {
-    event.preventDefault();
-    const file = event.dataTransfer.files[0];
-    if (file) {
-        const reader = new FileReader();
-        reader.onload = (e) => {
-            editor.value = e.target.result;
-            buffers[currentBuffer] = e.target.result;
-            updateStatusBar();
-            updateLineNumbers();
-        };
-        reader.readAsText(file);
-    }
-});
-
-loadButton.addEventListener('click', () => {
-    editor.click(); // Trigger file dialog
-});
-
-// ... (previous code)
-
-let mode = 'normal'; // normal, insert, visual
-const miniBuffer = document.getElementById('mini-buffer');
-
-const keybindings = {
-    normal: {
-        'i': () => { mode = 'insert'; updateStatusBar(); },
-        'v': () => { mode = 'visual'; updateStatusBar(); },
-        // Add more normal mode keybindings
-    },
-    insert: {
-        'Escape': () => { mode = 'normal'; updateStatusBar(); },
-        // Add insert mode keybindings
-    },
-    visual: {
-        'Escape': () => { mode = 'normal'; updateStatusBar(); },
-        // Add visual mode keybindings
-    },
-};
-
-editor.addEventListener('keydown', (event) => {
-    const key = event.key;
-    if (keybindings[mode] && keybindings[mode][key]) {
-        event.preventDefault();
-        keybindings[mode][key]();
-    } else if (mode === 'normal' && event.ctrlKey) {
-            // previous ctrl key functionality.
-    }
-    updateStatusBar();
-});
-
-function updateStatusBar() {
-    // ... (previous status bar logic)
-    statusBar.textContent = `Buffer: ${currentBuffer} | Line: ${line} | Col: ${col} | Mode: ${mode}`;
-}
-
-function showMiniBuffer(prompt, callback) {
-    miniBuffer.textContent = prompt;
-    editor.addEventListener('keydown', (event) => {
-        if (event.key === 'Enter') {
-            callback(miniBuffer.textContent);
-            miniBuffer.textContent = '';
-        } else {
-            miniBuffer.textContent += event.key;
+        if(event.key === 'g' && event.getModifierState('Shift') === false){
+          let nextKey = "";
+          function handleNextKey(nextEvent){
+            nextKey = nextEvent.key;
+            if(nextKey === 'g'){
+              goToTop();
+            }
+            document.removeEventListener('keydown', handleNextKey);
+          }
+          document.addEventListener('keydown', handleNextKey);
         }
-    }, { once: true });
+
+        event.preventDefault(); // Prevent default behavior (scrolling, etc.)
+    }
 }
-updateBufferList();
-updateStatusBar();
-updateLineNumbers();
+
+function moveDown() {
+    const lines = textArea.value.split('\n');
+    let cursor = textArea.selectionStart;
+    let currentLine = 0;
+    let lineStart = 0;
+    for (let i = 0; i < lines.length; i++) {
+        const lineEnd = lineStart + lines[i].length + 1; // +1 for newline
+        if (cursor >= lineStart && cursor < lineEnd) {
+            currentLine = i;
+            break;
+        }
+        lineStart = lineEnd;
+    }
+    if (currentLine < lines.length - 1) {
+        const nextLineStart = lineStart + lines[currentLine].length + 1;
+        textArea.selectionStart = Math.min(nextLineStart + (cursor - lineStart), nextLineStart + lines[currentLine + 1].length);
+        textArea.selectionEnd = textArea.selectionStart;
+    }
+}
+
+function moveUp() {
+    const lines = textArea.value.split('\n');
+    let cursor = textArea.selectionStart;
+    let currentLine = 0;
+    let lineStart = 0;
+    for (let i = 0; i < lines.length; i++) {
+        const lineEnd = lineStart + lines[i].length + 1;
+        if (cursor >= lineStart && cursor < lineEnd) {
+            currentLine = i;
+            break;
+        }
+        lineStart = lineEnd;
+    }
+    if (currentLine > 0) {
+        let prevLineStart = 0;
+        for(let i = 0; i < currentLine; i++){
+          prevLineStart += lines[i].length + 1;
+        }
+        textArea.selectionStart = Math.min(prevLineStart + (cursor - lineStart), prevLineStart + lines[currentLine - 1].length);
+        textArea.selectionEnd = textArea.selectionStart;
+    }
+}
+
+function moveLeft() {
+    if (textArea.selectionStart > 0) {
+        textArea.selectionStart--;
+        textArea.selectionEnd = textArea.selectionStart;
+    }
+}
+
+function moveRight() {
+    if (textArea.selectionStart < textArea.value.length) {
+        textArea.selectionStart++;
+        textArea.selectionEnd = textArea.selectionStart;
+    }
+}
+
+function goToTop() {
+    textArea.selectionStart = 0;
+    textArea.selectionEnd = 0;
+}
+
+function goToBottom() {
+    textArea.selectionStart = textArea.value.length;
+    textArea.selectionEnd = textArea.selectionStart;
+}
+
+// Toggle Command Mode
+function toggleCommandMode() {
+    commandMode = !commandMode;
+    if (commandMode) {
+        textArea.style.backgroundColor = '#282c34'; // Indicate command mode
+    } else {
+        textArea.style.backgroundColor = '#1c1e26'; // Normal mode
+    }
+}
+
+textArea.addEventListener('keydown', (event) => {
+    if (event.key === ':') {
+        toggleCommandMode();
+        event.preventDefault(); // Prevent default colon insertion.
+    } else {
+      handleVimMotion(event);
+    }
+});
+
+editor.addEventListener('scroll', function(){
+    lineNumbers.scrollTop = editor.scrollTop;
+});

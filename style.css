@@ -1,87 +1,57 @@
 body {
-    background-color: #1c1e26;
-    color: #c0caf5;
-    font-family: monospace;
     margin: 0;
-    padding: 0;
-}
-
-#buffer-list {
-    background-color: #282c34;
-    color: #abb2bf;
-    padding: 5px;
-    overflow-x: auto;
-    white-space: nowrap;
-}
-
-#buffer-list button {
-    background-color: #3e4451;
-    color: #abb2bf;
-    border: none;
-    padding: 5px 10px;
-    margin-right: 5px;
-    cursor: pointer;
+    font-family: monospace;
+    background-color: #1c1e26;
+    color: #c8c8c8;
+    display: flex; /*Added for line numbers*/
 }
 
 #editor-container {
     display: flex;
+    height: 100vh;
+    flex-grow: 1; /*Added for line numbers*/
 }
 
-#line-numbers {
-    background-color: #282c34;
-    color: #616775;
-    padding: 20px 10px;
-    text-align: right;
-    font-size: 16px;
-    box-sizing: border-box;
+#buffer-list {
+    width: 200px;
+    background-color: #242831;
+    padding: 10px;
+    overflow-y: auto;
+}
+
+#buffer-list button {
+    display: block;
+    width: 100%;
+    padding: 5px;
+    margin-bottom: 5px;
+    background-color: #303446;
+    color: #c8c8c8;
+    border: none;
+    text-align: left;
+    cursor: pointer;
+}
+
+#buffer-list button.active {
+    background-color: #7aa2f7;
+    color: #1c1e26;
 }
 
 #editor {
-    width: 100%;
-    height: calc(100vh - 80px); /* Adjust height for buttons */
-    background-color: #1c1e26;
-    color: #c0caf5;
-    border: none;
-    padding: 20px;
-    font-size: 16px;
-    resize: none;
-    outline: none;
-    line-height: 1.5;
-}
-
-#button-container {
-    background-color: #282c34;
+    flex-grow: 1;
     padding: 10px;
-    text-align: center;
+    position: relative; /*For line numbers*/
 }
 
-#button-container button {
-    background-color: #3e4451;
-    color: #abb2bf;
+#text-area {
+    width: 100%;
+    height: 100%;
+    background-color: #1c1e26;
+    color: #c8c8c8;
     border: none;
-    padding: 10px 20px;
-    margin: 0 10px;
-    cursor: pointer;
-    font-size: 16px;
-}
-
-#status-bar {
-    background-color: #282c34;
-    color: #abb2bf;
-    padding: 5px 10px;
+    outline: none;
+    resize: none;
+    font-family: monospace;
     font-size: 14px;
-    position: fixed;
-    bottom: 0;
-    width: 100%;
-}
-
-#mini-buffer {
-    background-color: #282c34;
-    color: #abb2bf;
-    padding: 5px 10px;
-    font-size: 14px;
-    position: fixed;
-    bottom: 30px;
-    width: 100%;
-    border-top: 1px solid #3e4451;
+    line-height: 1.5;
+    white-space: pre-wrap; /*allows for line wrapping*/
 }

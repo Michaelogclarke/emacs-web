@@ -1,21 +1,19 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>Doom Emacs-like Editor</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Web Doom Org</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <div id="buffer-list"></div>
     <div id="editor-container">
-        <div id="line-numbers"></div>
-        <textarea id="editor"></textarea>
+        <div id="buffer-list">
+            </div>
+        <div id="editor">
+            <textarea id="text-area"></textarea>
+        </div>
     </div>
-    <div id="mini-buffer"></div>
-    <div id="button-container">
-        <button onclick="saveFile(prompt('Enter file name:'), editor.value)">Save</button>
-        <button id="loadButton">Load</button>
-    </div>
-    <div id="status-bar"></div>
     <script src="script.js"></script>
 </body>
 </html>
