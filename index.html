@@ -1,19 +1,18 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Web Doom Org</title>
+    <title>Web Emacs</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
+    <div id="buffer-list"></div>
+    <div id="outline-view"></div>
     <div id="editor-container">
-        <div id="buffer-list">
-            </div>
-        <div id="editor">
-            <textarea id="text-area"></textarea>
-        </div>
+        <div id="line-numbers"></div>
+        <textarea id="editor"></textarea>
     </div>
+    <div id="mini-buffer"></div>
+    <div id="status-bar"></div>
     <script src="script.js"></script>
 </body>
 </html>

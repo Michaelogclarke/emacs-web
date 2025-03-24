@@ -1,274 +1,309 @@
-const bufferList = document.getElementById('buffer-list');
-const textArea = document.getElementById('text-area');
-const editor = document.getElementById('editor'); //Get the editor div.
-let buffers = {};
-let currentBuffer = 'default';
-let commandMode = false;
-function createBuffer(name, content = '') {
-    buffers[name] = content;
-    const button = document.createElement('button');
-    button.textContent = name;
-    button.addEventListener('click', () => switchBuffer(name));
-    bufferList.appendChild(button);
+let buffers = JSON.parse(localStorage.getItem("webEmacsBuffers")) || { "main": "" };
+let currentBuffer = localStorage.getItem("webEmacsCurrentBuffer") || "main";
+
+const editor = document.getElementById("editor");
+const bufferList = document.getElementById("buffer-list");
+const statusBar = document.getElementById("status-bar");
+const outlineView = document.getElementById("outline-view");
+const miniBuffer = document.getElementById("mini-buffer");
+
+function updateBufferList() {
+    bufferList.innerHTML = "";
+    for (let bufferName in buffers) {
+        const button = document.createElement("button");
+        button.textContent = bufferName;
+        button.addEventListener("click", () => switchBuffer(bufferName));
+        bufferList.appendChild(button);
+    }
 }
 
-function switchBuffer(name) {
-    saveBuffers();
-    buffers[currentBuffer] = textArea.value;
-    currentBuffer = name;
-    textArea.value = buffers[name];
-    updateActiveBufferButton();
-    highlightSyntax();
-    updateLineNumbers(); // Update line numbers after switching
+function switchBuffer(bufferName) {
+    buffers[currentBuffer] = editor.value;
+    currentBuffer = bufferName;
+    editor.value = buffers[bufferName];
+    updateStatusBar();
+    updateOutlineView();
 }
 
-function updateActiveBufferButton() {
-    const buttons = bufferList.querySelectorAll('button');
-    buttons.forEach(button => {
-        if (button.textContent === currentBuffer) {
-            button.classList.add('active');
+function createBuffer(bufferName) {
+    if (!buffers[bufferName]) {
+        buffers[bufferName] = "";
+        updateBufferList();
+    }
+}
+
+function deleteBuffer(bufferName) {
+    if (buffers[bufferName]) {
+        delete buffers[bufferName];
+        if (currentBuffer === bufferName) {
+            currentBuffer = "main";
+            editor.value = buffers["main"];
+        }
+        updateBufferList();
+        updateStatusBar();
+        updateOutlineView();
+    }
+}
+
+function updateStatusBar() {
+    statusBar.textContent = "Current Buffer: " + currentBuffer;
+}
+
+editor.addEventListener("input", () => {
+    buffers[currentBuffer] = editor.value;
+    updateOutlineView();
+});
+
+document.addEventListener("keydown", (event) => {
+    if (event.ctrlKey) {
+        switch (event.key) {
+            case "b":
+                const newBufferName = prompt("Enter buffer name:");
+                if (newBufferName) {
+                    createBuffer(newBufferName);
+                    switchBuffer(newBufferName);
+                }
+                break;
+            case "s":
+                // Save buffer logic (e.g., local storage)
+                console.log("Buffer saved");
+                break;
+            case "o":
+                const openBufferName = prompt("Open buffer name:");
+                if (openBufferName && buffers[openBufferName]) {
+                    switchBuffer(openBufferName);
+                }
+                break;
+            case "d":
+                deleteBuffer(currentBuffer);
+                break;
+            case "ArrowUp":
+                moveParagraphUp();
+                break;
+            case "ArrowDown":
+                moveParagraphDown();
+                break;
+            case "ArrowLeft":
+                moveWordLeft();
+                break;
+            case "ArrowRight":
+                moveWordRight();
+                break;
+            case "k":
+                killLine();
+                break;
+            case "h":
+                createHeading();
+                break;
+        }
+    }
+});
+
+function saveBuffersToLocalStorage() {
+    localStorage.setItem("webEmacsBuffers", JSON.stringify(buffers));
+    localStorage.setItem("webEmacsCurrentBuffer", currentBuffer);
+}
+
+editor.addEventListener("input", () => {
+    buffers[currentBuffer] = editor.value;
+    updateOutlineView();
+    saveBuffersToLocalStorage();
+});
+
+document.addEventListener("keydown", (event) => {
+    if (event.ctrlKey) {
+        switch (event.key) {
+            // ... (buffer keybindings from previous example)
+            case "f":
+                searchPrompt();
+                break;
+            case "r":
+                replacePrompt();
+                break;
+            case "Enter":
+                executeMiniBufferCommand();
+                break;
+            case "ArrowUp":
+                moveParagraphUp();
+                break;
+            case "ArrowDown":
+                moveParagraphDown();
+                break;
+            case "ArrowLeft":
+                moveWordLeft();
+                break;
+            case "ArrowRight":
+                moveWordRight();
+                break;
+            case "k":
+                killLine();
+                break;
+        }
+    }
+});
+
+function searchPrompt() {
+    const searchTerm = prompt("Search for:");
+    if (searchTerm) {
+        const index = editor.value.indexOf(searchTerm, editor.selectionStart);
+        if (index !== -1) {
+            editor.selectionStart = index;
+            editor.selectionEnd = index + searchTerm.length;
         } else {
-            button.classList.remove('active');
+            alert("Search term not found.");
+        }
+    }
+}
+
+function replacePrompt() {
+    const searchTerm = prompt("Replace:");
+    if (searchTerm) {
+        const replaceTerm = prompt("Replace with:");
+        if (replaceTerm) {
+            editor.value = editor.value.replace(searchTerm, replaceTerm);
+            buffers[currentBuffer] = editor.value;
+        }
+    }
+}
+
+function executeMiniBufferCommand() {
+    const command = miniBuffer.textContent.trim();
+    const parts = command.split(" ");
+    switch (parts[0]) {
+        case ":save":
+            saveBuffersToLocalStorage();
+            miniBuffer.textContent = "";
+            break;
+        case ":open":
+            if (parts[1] && buffers[parts[1]]) {
+                switchBuffer(parts[1]);
+                miniBuffer.textContent = "";
+            } else {
+                miniBuffer.textContent = "Invalid buffer name.";
+            }
+            break;
+        case ":delete":
+            if (parts[1] && buffers[parts[1]]) {
+                deleteBuffer(parts[1]);
+                miniBuffer.textContent = "";
+            } else {
+                miniBuffer.textContent = "Invalid buffer name.";
+            }
+            break;
+        case ":time":
+            editor.value += new Date().toLocaleString();
+            miniBuffer.textContent = "";
+            break;
+        case ":task":
+            const cursorPosition = editor.selectionStart;
+            const currentLineStart = editor.value.lastIndexOf('\n', cursorPosition-1) +1;
+            const currentLine = editor.value.slice(currentLineStart, editor.value.indexOf('\n', cursorPosition));
+            if(currentLine.includes("[ ]")){
+                editor.value = editor.value.slice(0, currentLineStart) + currentLine.replace("[ ]", "[X]") + editor.value.slice(editor.value.indexOf('\n', cursorPosition));
+            } else if (currentLine.includes("[X]")){
+                editor.value = editor.value.slice(0, currentLineStart) + currentLine.replace("[X]", "[-]") + editor.value.slice(editor.value.indexOf('\n', cursorPosition));
+            } else if (currentLine.includes("[-]")){
+                editor.value = editor.value.slice(0, currentLineStart) + currentLine.replace("[-]", "[ ]") + editor.value.slice(editor.value.indexOf('\n', cursorPosition));
+            } else {
+                editor.value = editor.value.slice(0, currentLineStart) + "[ ] " + editor.value.slice(cursorPosition);
+            }
+            miniBuffer.textContent = "";
+            break;
+        default:
+            miniBuffer.textContent = "Invalid command.";
+    }
+}
+function moveParagraphUp() {
+    const cursorPosition = editor.selectionStart;
+    const previousParagraphEnd = editor.value.lastIndexOf('\n\n', cursorPosition-1);
+    if (previousParagraphEnd !== -1) {
+        editor.selectionStart = previousParagraphEnd + 2;
+        editor.selectionEnd = previousParagraphEnd + 2;
+    }
+}
+function moveParagraphDown() {
+    const cursorPosition = editor.selectionStart;
+    const nextParagraphStart = editor.value.indexOf('\n\n', cursorPosition);
+    if (nextParagraphStart !== -1) {
+        editor.selectionStart = nextParagraphStart + 2;
+        editor.selectionEnd = nextParagraphStart + 2;
+    }
+}
+function moveWordLeft(){
+    const cursorPosition = editor.selectionStart;
+    let newPosition = cursorPosition -1;
+    while(newPosition > 0 && editor.value[newPosition].match(/\s/)){
+        newPosition--;
+    }
+    while(newPosition > 0 && !editor.value[newPosition].match(/\s/)){
+        newPosition--;
+    }
+    editor.selectionStart = newPosition+1;
+    editor.selectionEnd = newPosition+1;
+}
+function moveWordRight(){
+    const cursorPosition = editor.selectionStart;
+    let newPosition = cursorPosition + 1;
+    while(newPosition < editor.value.length && editor.value[newPosition].match(/\s/)){
+        newPosition++;
+    }
+    while(newPosition < editor.value.length && !editor.value[newPosition].match(/\s/)){
+        newPosition++;
+    }
+    editor.selectionStart = newPosition;
+    editor.selectionEnd = newPosition;
+}
+function killLine(){
+    const cursorPosition = editor.selectionStart;
+    const nextLine = editor.value.indexOf('\n', cursorPosition);
+    if(nextLine === -1){
+        editor.value = editor.value.slice(0, cursorPosition);
+    } else {
+        editor.value = editor.value.slice(0, cursorPosition) + editor.value.slice(nextLine+1);
+    }
+    editor.selectionStart = cursorPosition;
+    editor.selectionEnd = cursorPosition;
+}
+function updateOutlineView() {
+    outlineView.innerHTML = "";
+    const lines = editor.value.split("\n");
+    lines.forEach((line) => {
+        if (line.startsWith("*")) {
+            const heading = document.createElement("div");
+            heading.textContent = line;
+            heading.classList.add("outline-view-heading");
+            outlineView.appendChild(heading);
         }
     });
 }
-
-function saveBuffers() {
-    localStorage.setItem('buffers', JSON.stringify(buffers));
-    localStorage.setItem('currentBuffer', currentBuffer);
+function moveParagraphUp() {
+    //move cursor up a paragraph
 }
-
-function loadBuffers() {
-    const storedBuffers = JSON.parse(localStorage.getItem('buffers'));
-    const storedCurrentBuffer = localStorage.getItem('currentBuffer');
-    if (storedBuffers) {
-        buffers = storedBuffers;
-        for (const name in buffers) {
-            createBuffer(name, buffers[name]);
-        }
-        currentBuffer = storedCurrentBuffer || 'default';
-        textArea.value = buffers[currentBuffer] || '';
-        updateActiveBufferButton();
-        highlightSyntax();
-        updateLineNumbers();
-    } else {
-        createBuffer('default', "");
-        updateActiveBufferButton();
-        updateLineNumbers();
+function moveParagraphDown() {
+    //move cursor down a paragraph
+}
+function moveWordLeft(){
+    //move cursor left a word.
+}
+function moveWordRight(){
+    //move cursor right a word.
+}
+function killLine(){
+    //delete line from cursor to end.
+}
+function createHeading(){
+    const headingText = prompt("Enter heading text:");
+    if(headingText){
+        const cursorPosition = editor.selectionStart;
+        const currentLineStart = editor.value.lastIndexOf('\n', cursorPosition-1) +1;
+        const newLine = editor.value.slice(0, currentLineStart) + "* " + headingText + editor.value.slice(cursorPosition);
+        editor.value = newLine;
+        buffers[currentBuffer] = newLine;
+        updateOutlineView();
     }
 }
 
-loadBuffers();
-
-textArea.addEventListener('input', () => {
-    buffers[currentBuffer] = textArea.value;
-    highlightSyntax();
-    updateLineNumbers();
-});
-
-function newBuffer() {
-    const newName = prompt("Enter new buffer name:", "new-buffer");
-    if (newName && !buffers[newName]) {
-        createBuffer(newName, "");
-        switchBuffer(newName);
-    } else {
-        alert("Invalid or existing name");
-    }
-}
-
-const newBufferButton = document.createElement("button");
-newBufferButton.textContent = "New Buffer";
-newBufferButton.addEventListener("click", newBuffer);
-bufferList.appendChild(newBufferButton);
-
-// Syntax Highlighting (Basic JavaScript)
-function highlightSyntax() {
-    let content = textArea.value;
-    content = content.replace(/(function|var|let|const|if|else|for|while)/g, '<span style="color: #c678dd;">$1</span>');
-    content = content.replace(/(\d+)/g, '<span style="color: #d19a66;">$1</span>');
-    content = content.replace(/(".*?"|'.*?')/g, '<span style="color: #98c379;">$1</span>');
-    textArea.innerHTML = content;
-}
-
-// Search Functionality
-function search() {
-    const searchTerm = prompt("Enter search term:");
-    if (searchTerm) {
-        const regex = new RegExp(searchTerm, 'gi');
-        const matches = textArea.value.match(regex);
-        if (matches) {
-            alert(`Found ${matches.length} matches.`);
-            const highlightedText = textArea.value.replace(regex, '<span style="background-color: yellow;">$&</span>');
-            textArea.innerHTML = highlightedText;
-        } else {
-            alert("No matches found.");
-        }
-    }
-}
-
-const searchButton = document.createElement("button");
-searchButton.textContent = "Search";
-searchButton.addEventListener("click", search);
-bufferList.appendChild(searchButton);
-
-// Line Numbers
-const lineNumbers = document.createElement("div");
-lineNumbers.style.width = "30px";
-lineNumbers.style.backgroundColor = "#282c34";
-lineNumbers.style.color = "#828997";
-lineNumbers.style.padding = "10px";
-lineNumbers.style.overflowY = "hidden"; //Remove line number scroll bar.
-lineNumbers.style.whiteSpace = "pre";
-lineNumbers.style.textAlign = "right";
-lineNumbers.style.height = "100%";
-lineNumbers.style.boxSizing = "border-box";
-document.getElementById("editor-container").insertBefore(lineNumbers, document.getElementById("editor"));
-
-function updateLineNumbers() {
-    const lines = textArea.value.split("\n");
-    let numbers = "";
-    for (let i = 1; i <= lines.length; i++) {
-        numbers += i + "\n";
-    }
-    lineNumbers.textContent = numbers;
-}
-
-textArea.addEventListener("input", updateLineNumbers);
-updateLineNumbers();
-
-//Synchronize scroll.
-editor.addEventListener('scroll', function(){
-    lineNumbers.scrollTop = editor.scrollTop;
-});
-
-function handleVimMotion(event) {
-    if (commandMode) {
-        switch (event.key) {
-            case 'j':
-                moveDown();
-                break;
-            case 'k':
-                moveUp();
-                break;
-            case 'h':
-                moveLeft();
-                break;
-            case 'l':
-                moveRight();
-                break;
-            case 'g':
-                if (event.getModifierState("Shift")){
-                  goToBottom();
-                }
-                break;
-            case 'G':
-                goToBottom();
-                break;
-            default:
-                break;
-        }
-        if(event.key === 'g' && event.getModifierState('Shift') === false){
-          let nextKey = "";
-          function handleNextKey(nextEvent){
-            nextKey = nextEvent.key;
-            if(nextKey === 'g'){
-              goToTop();
-            }
-            document.removeEventListener('keydown', handleNextKey);
-          }
-          document.addEventListener('keydown', handleNextKey);
-        }
-
-        event.preventDefault(); // Prevent default behavior (scrolling, etc.)
-    }
-}
-
-function moveDown() {
-    const lines = textArea.value.split('\n');
-    let cursor = textArea.selectionStart;
-    let currentLine = 0;
-    let lineStart = 0;
-    for (let i = 0; i < lines.length; i++) {
-        const lineEnd = lineStart + lines[i].length + 1; // +1 for newline
-        if (cursor >= lineStart && cursor < lineEnd) {
-            currentLine = i;
-            break;
-        }
-        lineStart = lineEnd;
-    }
-    if (currentLine < lines.length - 1) {
-        const nextLineStart = lineStart + lines[currentLine].length + 1;
-        textArea.selectionStart = Math.min(nextLineStart + (cursor - lineStart), nextLineStart + lines[currentLine + 1].length);
-        textArea.selectionEnd = textArea.selectionStart;
-    }
-}
-
-function moveUp() {
-    const lines = textArea.value.split('\n');
-    let cursor = textArea.selectionStart;
-    let currentLine = 0;
-    let lineStart = 0;
-    for (let i = 0; i < lines.length; i++) {
-        const lineEnd = lineStart + lines[i].length + 1;
-        if (cursor >= lineStart && cursor < lineEnd) {
-            currentLine = i;
-            break;
-        }
-        lineStart = lineEnd;
-    }
-    if (currentLine > 0) {
-        let prevLineStart = 0;
-        for(let i = 0; i < currentLine; i++){
-          prevLineStart += lines[i].length + 1;
-        }
-        textArea.selectionStart = Math.min(prevLineStart + (cursor - lineStart), prevLineStart + lines[currentLine - 1].length);
-        textArea.selectionEnd = textArea.selectionStart;
-    }
-}
-
-function moveLeft() {
-    if (textArea.selectionStart > 0) {
-        textArea.selectionStart--;
-        textArea.selectionEnd = textArea.selectionStart;
-    }
-}
-
-function moveRight() {
-    if (textArea.selectionStart < textArea.value.length) {
-        textArea.selectionStart++;
-        textArea.selectionEnd = textArea.selectionStart;
-    }
-}
-
-function goToTop() {
-    textArea.selectionStart = 0;
-    textArea.selectionEnd = 0;
-}
-
-function goToBottom() {
-    textArea.selectionStart = textArea.value.length;
-    textArea.selectionEnd = textArea.selectionStart;
-}
-
-// Toggle Command Mode
-function toggleCommandMode() {
-    commandMode = !commandMode;
-    if (commandMode) {
-        textArea.style.backgroundColor = '#282c34'; // Indicate command mode
-    } else {
-        textArea.style.backgroundColor = '#1c1e26'; // Normal mode
-    }
-}
-
-textArea.addEventListener('keydown', (event) => {
-    if (event.key === ':') {
-        toggleCommandMode();
-        event.preventDefault(); // Prevent default colon insertion.
-    } else {
-      handleVimMotion(event);
-    }
-});
-
-editor.addEventListener('scroll', function(){
-    lineNumbers.scrollTop = editor.scrollTop;
-});
+updateBufferList();
+updateStatusBar();
+updateOutlineView();
+editor.value = buffers[currentBuffer];
