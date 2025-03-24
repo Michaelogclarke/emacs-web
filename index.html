@@ -1,21 +1,21 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Emacs-like Text Editor</title>
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.0/codemirror.min.css">
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.0/codemirror.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.0/keymap/emacs.min.js"></script>
+    <title>Doom Emacs-like Editor</title>
+    <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <textarea id="editor"></textarea>
-  <script>
-    const editor = CodeMirror.fromTextArea(document.getElementById('editor'), {
-      lineNumbers: true,
-      mode: "text/plain",
-      keyMap: "emacs", // Enable Emacs keybindings
-    });
-  </script>
+    <div id="buffer-list"></div>
+    <div id="editor-container">
+        <div id="line-numbers"></div>
+        <textarea id="editor"></textarea>
+    </div>
+    <div id="mini-buffer"></div>
+    <div id="button-container">
+        <button onclick="saveFile(prompt('Enter file name:'), editor.value)">Save</button>
+        <button id="loadButton">Load</button>
+    </div>
+    <div id="status-bar"></div>
+    <script src="script.js"></script>
 </body>
 </html>
